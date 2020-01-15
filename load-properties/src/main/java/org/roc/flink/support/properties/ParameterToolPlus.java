@@ -1,57 +1,93 @@
-package org.springframework.boot;
+package org.roc.flink.support.properties;
 
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import org.springframework.core.env.CommandLinePropertySource;
 import org.springframework.core.env.CompositePropertySource;
 import org.springframework.core.env.ConfigurableEnvironment;
+import org.springframework.core.env.Environment;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.MutablePropertySources;
 import org.springframework.core.env.PropertySource;
 import org.springframework.core.env.SimpleCommandLinePropertySource;
+import org.springframework.core.env.StandardEnvironment;
+import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.ResourceLoader;
-import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
 /**
  * @author roc
- * @since 2020/1/14 13:58
+ * @since 2020/1/13 13:04
  */
-public class MiniSpringApplication {
-
-    private ResourceLoader resourceLoader;
+public class ParameterToolPlus {
 
     private Map<String, Object> defaultProperties;
-
-    private Set<Class<?>> primarySources;
 
     private boolean addCommandLineProperties = true;
 
     private Set<String> additionalProfiles = new HashSet<>();
 
+    private StandardEnvironment standardEnvironment;
+
+    private ParameterToolPlus(String[] args) {
+        standardEnvironment = new StandardEnvironment();
+        configureEnvironment(standardEnvironment, args);
+        new Loader(standardEnvironment, null).load();
+    }
+
     /**
-     * Create a new {@link SpringApplication} instance. The application context will load
-     * beans from the specified primary sources (see {@link SpringApplication class-level}
-     * documentation for details. The instance can be customized before calling
-     * {@link #run(String...)}.
-     * @param resourceLoader the resource loader to use
-     * @param primarySources the primary bean sources
-     * @see #run(Class, String[])
-     * @see #setSources(Set)
+     * 加载所有的配置文件，功效等同于springboot的配置文件加载
+     * @return 获取参数工具类
      */
-    @SuppressWarnings({ "unchecked", "rawtypes" })
-    public MiniSpringApplication(ResourceLoader resourceLoader, Class<?>... primarySources) {
-        this.resourceLoader = resourceLoader;
-        Assert.notNull(primarySources, "PrimarySources must not be null");
-        this.primarySources = new LinkedHashSet<>(Arrays.asList(primarySources));
-//        this.webApplicationType = WebApplicationType.deduceFromClasspath();
-//        setInitializers((Collection) getSpringFactoriesInstances(
-//                ApplicationContextInitializer.class));
-//        setListeners((Collection) getSpringFactoriesInstances(ApplicationListener.class));
-//        this.mainApplicationClass = deduceMainApplicationClass();
+    public static ParameterToolPlus loadProperties() {
+        return new ParameterToolPlus(null);
+    }
+
+    /**
+     * 加载所有的配置文件，功效等同于springboot的配置文件加载
+     * @param args 命令行参数
+     * @return 获取参数工具类
+     */
+    public static ParameterToolPlus loadProperties(String[] args) {
+        return new ParameterToolPlus(args);
+    }
+
+    //---------------------------------------------------------------------
+    // Implementation of PropertyResolver interface
+    //---------------------------------------------------------------------
+    
+    public boolean containsProperty(String key) {
+        return this.standardEnvironment.containsProperty(key);
+    }
+
+    public String getProperty(String key) {
+        return this.standardEnvironment.getProperty(key);
+    }
+
+    public String getProperty(String key, String defaultValue) {
+        return this.standardEnvironment.getProperty(key, defaultValue);
+    }
+    
+    public <T> T getProperty(String key, Class<T> targetType) {
+        return this.standardEnvironment.getProperty(key, targetType);
+    }
+    
+    public <T> T getProperty(String key, Class<T> targetType, T defaultValue) {
+        return this.standardEnvironment.getProperty(key, targetType, defaultValue);
+    }
+    
+    public String getRequiredProperty(String key) throws IllegalStateException {
+        return this.standardEnvironment.getRequiredProperty(key);
+    }
+
+    public <T> T getRequiredProperty(String key, Class<T> targetType) throws IllegalStateException {
+        return this.standardEnvironment.getRequiredProperty(key, targetType);
     }
 
     /**
@@ -128,22 +164,22 @@ public class MiniSpringApplication {
     }
 
     /**
-     * The ResourceLoader that will be used in the ApplicationContext.
-     * @return the resourceLoader the resource loader that will be used in the
-     * ApplicationContext (or null if the default)
+     * Set default environment properties which will be used in addition to those in the
+     * existing {@link Environment}.
+     * @param defaultProperties the additional properties to set
      */
-    public ResourceLoader getResourceLoader() {
-        return this.resourceLoader;
+    public void setDefaultProperties(Map<String, Object> defaultProperties) {
+        this.defaultProperties = defaultProperties;
     }
 
     /**
-     * Sets the {@link ResourceLoader} that should be used when loading resources.
-     * @param resourceLoader the resource loader
+     * Convenient alternative to {@link #setDefaultProperties(Map)}.
+     * @param defaultProperties some {@link Properties}
      */
-    public void setResourceLoader(ResourceLoader resourceLoader) {
-        Assert.notNull(resourceLoader, "ResourceLoader must not be null");
-        this.resourceLoader = resourceLoader;
+    public void setDefaultProperties(Properties defaultProperties) {
+        this.defaultProperties = new HashMap<>();
+        for (Object key : Collections.list(defaultProperties.propertyNames())) {
+            this.defaultProperties.put((String) key, defaultProperties.get(key));
+        }
     }
-
-
 }

@@ -23,7 +23,6 @@ import java.util.Objects;
 import java.util.stream.StreamSupport;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.springframework.boot.MiniSpringApplication;
 import org.springframework.boot.json.JsonParser;
 import org.springframework.boot.json.JsonParserFactory;
 import org.springframework.boot.origin.Origin;
@@ -39,9 +38,8 @@ import org.springframework.core.env.StandardEnvironment;
 import org.springframework.util.StringUtils;
 
 /**
- * An {@link EnvironmentPostProcessor} that parses JSON from
- * {@code spring.application.json} or equivalently {@code SPRING_APPLICATION_JSON} and
- * adds it as a map property source to the {@link Environment}. The new properties are
+ * An {@link EnvironmentPostProcessor} that parses JSON from {@code spring.application.json} or equivalently {@code
+ * SPRING_APPLICATION_JSON} and adds it as a map property source to the {@link Environment}. The new properties are
  * added with higher priority than the system properties.
  *
  * @author Dave Syer
@@ -50,175 +48,168 @@ import org.springframework.util.StringUtils;
  * @since 1.3.0
  */
 public class SpringApplicationJsonEnvironmentPostProcessor
-		implements EnvironmentPostProcessor, Ordered {
+        implements EnvironmentPostProcessor, Ordered {
 
-	/**
-	 * Name of the {@code spring.application.json} property.
-	 */
-	public static final String SPRING_APPLICATION_JSON_PROPERTY = "spring.application.json";
+    /**
+     * Name of the {@code spring.application.json} property.
+     */
+    public static final String SPRING_APPLICATION_JSON_PROPERTY = "spring.application.json";
 
-	/**
-	 * Name of the {@code SPRING_APPLICATION_JSON} environment variable.
-	 */
-	public static final String SPRING_APPLICATION_JSON_ENVIRONMENT_VARIABLE = "SPRING_APPLICATION_JSON";
+    /**
+     * Name of the {@code SPRING_APPLICATION_JSON} environment variable.
+     */
+    public static final String SPRING_APPLICATION_JSON_ENVIRONMENT_VARIABLE = "SPRING_APPLICATION_JSON";
+    /**
+     * The default order for the processor.
+     */
+    public static final int DEFAULT_ORDER = Ordered.HIGHEST_PRECEDENCE + 5;
+    private static final String SERVLET_ENVIRONMENT_CLASS = "org.springframework.web."
+            + "context.support.StandardServletEnvironment";
+    private static final Log logger = LogFactory
+            .getLog(SpringApplicationJsonEnvironmentPostProcessor.class);
 
-	private static final String SERVLET_ENVIRONMENT_CLASS = "org.springframework.web."
-			+ "context.support.StandardServletEnvironment";
+    private int order = DEFAULT_ORDER;
 
-	/**
-	 * The default order for the processor.
-	 */
-	public static final int DEFAULT_ORDER = Ordered.HIGHEST_PRECEDENCE + 5;
+    @Override
+    public int getOrder() {
+        return this.order;
+    }
 
-	private static final Log logger = LogFactory
-			.getLog(SpringApplicationJsonEnvironmentPostProcessor.class);
+    public void setOrder(int order) {
+        this.order = order;
+    }
 
-	private int order = DEFAULT_ORDER;
+    @Override
+    public void postProcessEnvironment(ConfigurableEnvironment environment) {
+        MutablePropertySources propertySources = environment.getPropertySources();
+        StreamSupport.stream(propertySources.spliterator(), false)
+                .map(JsonPropertyValue::get).filter(Objects::nonNull).findFirst()
+                .ifPresent((v) -> processJson(environment, v));
+    }
 
-	@Override
-	public int getOrder() {
-		return this.order;
-	}
+    private void processJson(ConfigurableEnvironment environment,
+            JsonPropertyValue propertyValue) {
+        try {
+            JsonParser parser = JsonParserFactory.getJsonParser();
+            Map<String, Object> map = parser.parseMap(propertyValue.getJson());
+            if (!map.isEmpty()) {
+                addJsonPropertySource(environment,
+                        new JsonPropertySource(propertyValue, flatten(map)));
+            }
+        } catch (Exception ex) {
+            logger.warn("Cannot parse JSON for spring.application.json: "
+                    + propertyValue.getJson(), ex);
+        }
+    }
 
-	public void setOrder(int order) {
-		this.order = order;
-	}
+    /**
+     * Flatten the map keys using period separator.
+     *
+     * @param map the map that should be flattened
+     * @return the flattened map
+     */
+    private Map<String, Object> flatten(Map<String, Object> map) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        flatten(null, result, map);
+        return result;
+    }
 
-	@Override
-	public void postProcessEnvironment(ConfigurableEnvironment environment,
-			MiniSpringApplication application) {
-		MutablePropertySources propertySources = environment.getPropertySources();
-		StreamSupport.stream(propertySources.spliterator(), false)
-				.map(JsonPropertyValue::get).filter(Objects::nonNull).findFirst()
-				.ifPresent((v) -> processJson(environment, v));
-	}
+    private void flatten(String prefix, Map<String, Object> result,
+            Map<String, Object> map) {
+        String namePrefix = (prefix != null) ? prefix + "." : "";
+        map.forEach((key, value) -> extract(namePrefix + key, result, value));
+    }
 
-	private void processJson(ConfigurableEnvironment environment,
-			JsonPropertyValue propertyValue) {
-		try {
-			JsonParser parser = JsonParserFactory.getJsonParser();
-			Map<String, Object> map = parser.parseMap(propertyValue.getJson());
-			if (!map.isEmpty()) {
-				addJsonPropertySource(environment,
-						new JsonPropertySource(propertyValue, flatten(map)));
-			}
-		}
-		catch (Exception ex) {
-			logger.warn("Cannot parse JSON for spring.application.json: "
-					+ propertyValue.getJson(), ex);
-		}
-	}
+    @SuppressWarnings("unchecked")
+    private void extract(String name, Map<String, Object> result, Object value) {
+        if (value instanceof Map) {
+            flatten(name, result, (Map<String, Object>) value);
+        } else if (value instanceof Collection) {
+            int index = 0;
+            for (Object object : (Collection<Object>) value) {
+                extract(name + "[" + index + "]", result, object);
+                index++;
+            }
+        } else {
+            result.put(name, value);
+        }
+    }
 
-	/**
-	 * Flatten the map keys using period separator.
-	 * @param map the map that should be flattened
-	 * @return the flattened map
-	 */
-	private Map<String, Object> flatten(Map<String, Object> map) {
-		Map<String, Object> result = new LinkedHashMap<>();
-		flatten(null, result, map);
-		return result;
-	}
+    private void addJsonPropertySource(ConfigurableEnvironment environment,
+            PropertySource<?> source) {
+        MutablePropertySources sources = environment.getPropertySources();
+        String name = findPropertySource(sources);
+        if (sources.contains(name)) {
+            sources.addBefore(name, source);
+        } else {
+            sources.addFirst(source);
+        }
+    }
 
-	private void flatten(String prefix, Map<String, Object> result,
-			Map<String, Object> map) {
-		String namePrefix = (prefix != null) ? prefix + "." : "";
-		map.forEach((key, value) -> extract(namePrefix + key, result, value));
-	}
-
-	@SuppressWarnings("unchecked")
-	private void extract(String name, Map<String, Object> result, Object value) {
-		if (value instanceof Map) {
-			flatten(name, result, (Map<String, Object>) value);
-		}
-		else if (value instanceof Collection) {
-			int index = 0;
-			for (Object object : (Collection<Object>) value) {
-				extract(name + "[" + index + "]", result, object);
-				index++;
-			}
-		}
-		else {
-			result.put(name, value);
-		}
-	}
-
-	private void addJsonPropertySource(ConfigurableEnvironment environment,
-			PropertySource<?> source) {
-		MutablePropertySources sources = environment.getPropertySources();
-		String name = findPropertySource(sources);
-		if (sources.contains(name)) {
-			sources.addBefore(name, source);
-		}
-		else {
-			sources.addFirst(source);
-		}
-	}
-
-	private String findPropertySource(MutablePropertySources sources) {
+    private String findPropertySource(MutablePropertySources sources) {
 		/*if (ClassUtils.isPresent(SERVLET_ENVIRONMENT_CLASS, null) && sources
 				.contains(StandardServletEnvironment.JNDI_PROPERTY_SOURCE_NAME)) {
 			return StandardServletEnvironment.JNDI_PROPERTY_SOURCE_NAME;
 
 		}*/
-		return StandardEnvironment.SYSTEM_PROPERTIES_PROPERTY_SOURCE_NAME;
-	}
+        return StandardEnvironment.SYSTEM_PROPERTIES_PROPERTY_SOURCE_NAME;
+    }
 
-	private static class JsonPropertySource extends MapPropertySource
-			implements OriginLookup<String> {
+    private static class JsonPropertySource extends MapPropertySource
+            implements OriginLookup<String> {
 
-		private final JsonPropertyValue propertyValue;
+        private final JsonPropertyValue propertyValue;
 
-		JsonPropertySource(JsonPropertyValue propertyValue, Map<String, Object> source) {
-			super(SPRING_APPLICATION_JSON_PROPERTY, source);
-			this.propertyValue = propertyValue;
-		}
+        JsonPropertySource(JsonPropertyValue propertyValue, Map<String, Object> source) {
+            super(SPRING_APPLICATION_JSON_PROPERTY, source);
+            this.propertyValue = propertyValue;
+        }
 
-		@Override
-		public Origin getOrigin(String key) {
-			return this.propertyValue.getOrigin();
-		}
+        @Override
+        public Origin getOrigin(String key) {
+            return this.propertyValue.getOrigin();
+        }
 
-	}
+    }
 
-	private static class JsonPropertyValue {
+    private static class JsonPropertyValue {
 
-		private static final String[] CANDIDATES = { SPRING_APPLICATION_JSON_PROPERTY,
-				SPRING_APPLICATION_JSON_ENVIRONMENT_VARIABLE };
+        private static final String[] CANDIDATES = {SPRING_APPLICATION_JSON_PROPERTY,
+                SPRING_APPLICATION_JSON_ENVIRONMENT_VARIABLE};
 
-		private final PropertySource<?> propertySource;
+        private final PropertySource<?> propertySource;
 
-		private final String propertyName;
+        private final String propertyName;
 
-		private final String json;
+        private final String json;
 
-		JsonPropertyValue(PropertySource<?> propertySource, String propertyName,
-				String json) {
-			this.propertySource = propertySource;
-			this.propertyName = propertyName;
-			this.json = json;
-		}
+        JsonPropertyValue(PropertySource<?> propertySource, String propertyName,
+                String json) {
+            this.propertySource = propertySource;
+            this.propertyName = propertyName;
+            this.json = json;
+        }
 
-		public String getJson() {
-			return this.json;
-		}
+        public static JsonPropertyValue get(PropertySource<?> propertySource) {
+            for (String candidate : CANDIDATES) {
+                Object value = propertySource.getProperty(candidate);
+                if (value != null && value instanceof String
+                        && StringUtils.hasLength((String) value)) {
+                    return new JsonPropertyValue(propertySource, candidate,
+                            (String) value);
+                }
+            }
+            return null;
+        }
 
-		public Origin getOrigin() {
-			return PropertySourceOrigin.get(this.propertySource, this.propertyName);
-		}
+        public String getJson() {
+            return this.json;
+        }
 
-		public static JsonPropertyValue get(PropertySource<?> propertySource) {
-			for (String candidate : CANDIDATES) {
-				Object value = propertySource.getProperty(candidate);
-				if (value != null && value instanceof String
-						&& StringUtils.hasLength((String) value)) {
-					return new JsonPropertyValue(propertySource, candidate,
-							(String) value);
-				}
-			}
-			return null;
-		}
+        public Origin getOrigin() {
+            return PropertySourceOrigin.get(this.propertySource, this.propertyName);
+        }
 
-	}
+    }
 
 }
