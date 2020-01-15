@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>org.roc</groupId>
+  <artifactId>flink-support</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <modules>
+    <module>load-properties</module>
+  </modules>
+  <packaging>pom</packaging>
+
+  <properties>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <flink.version>1.9.0</flink.version>
+    <java.version>1.8</java.version>
+    <lombok.version>1.18.8</lombok.version>
+    <maven.compiler.source>1.8</maven.compiler.source>
+    <maven.compiler.target>1.8</maven.compiler.target>
+    <gson.version>2.8.5</gson.version>
+    <scala.binary.version>2.11</scala.binary.version>
+    <guava.version>28.0-jre</guava.version>
+
+    <simple-json.version>1.1.1</simple-json.version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>com.googlecode.json-simple</groupId>
+        <artifactId>json-simple</artifactId>
+        <version>${simple-json.version}</version>
+        <exclusions>
+          <exclusion>
+            <artifactId>junit</artifactId>
+            <groupId>junit</groupId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>com.google.code.gson</groupId>
+        <artifactId>gson</artifactId>
+        <version>${gson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.guava</groupId>
+        <artifactId>guava</artifactId>
+        <version>${guava.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.projectlombok</groupId>
+        <artifactId>lombok</artifactId>
+        <version>${lombok.version}</version>
+        <scope>provided</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <build>
+    <plugins>
+      <!-- Java Compiler -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.1</version>
+        <configuration>
+          <source>${java.version}</source>
+          <target>${java.version}</target>
+        </configuration>
+      </plugin>
+      <!--<plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <version>3.0.1</version>
+        <configuration>
+          <encoding>UTF-8</encoding>
+          <charset>UTF-8</charset>
+          <docencoding>UTF-8</docencoding>
+        </configuration>
+        <executions>
+          <execution>
+            <id>attach-javadocs</id>
+            <phase>package</phase>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+            <configuration>
+              &lt;!&ndash; <additionalparam>-Xdoclint:none</additionalparam>  &ndash;&gt;
+              <additionalJOption>-Xdoclint:none</additionalJOption>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>-->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-release-plugin</artifactId>
+        <version>2.5.3</version>
+        <configuration>
+          <scmCommentPrefix>release(all): </scmCommentPrefix>
+          <tagNameFormat>v@{project.version}</tagNameFormat>
+          <autoVersionSubmodules>true</autoVersionSubmodules>
+          <branchBase>https://github.com/roc-wong/flink-support.git/branches</branchBase>
+          <tagBase>https://github.com/roc-wong/flink-support.git/tags</tagBase>
+          <useReleaseProfile>false</useReleaseProfile>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+
+  <scm>
+    <connection>scm:git:https://github.com/roc-wong/flink-support.git</connection>
+    <url>https://github.com/roc-wong/flink-support.git</url>
+    <developerConnection>scm:git:https://github.com/roc-wong/flink-support.git</developerConnection>
+    <tag>HEAD</tag>
+  </scm>
+
+  <repositories>
+    <repository>
+      <id>local_nexus_releases</id>
+      <name>core Release Repository</name>
+      <url>http://10.29.181.13:8081/nexus/content/repositories/releases/</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+    </repository>
+    <repository>
+      <id>local_nexus_snapshots</id>
+      <name>core Release Repository</name>
+      <url>http://10.29.181.13:8081/nexus/content/repositories/snapshots/</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+    </repository>
+    <repository>
+      <id>local_nexus_3rd_party</id>
+      <name>core Release Repository</name>
+      <url>http://10.29.181.13:8081/nexus/content/repositories/thirdparty/</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+    </repository>
+  </repositories>
+
+  <distributionManagement>
+    <repository>
+      <id>local_nexus_releases</id>
+      <name>core Release Repository</name>
+      <url>http://10.29.181.13:8081/nexus/content/repositories/releases/</url>
+    </repository>
+    <snapshotRepository>
+      <id>local_nexus_snapshots</id>
+      <name>core Snapshots Repository</name>
+      <url>http://10.29.181.13:8081/nexus/content/repositories/snapshots/</url>
+    </snapshotRepository>
+  </distributionManagement>
+
+  <organization>
+    <name>中泰证券</name>
+  </organization>
+
+  <developers>
+    <developer>
+      <id>roc</id>
+      <name>Roc wong</name>
+      <email>roc.fly@qq.com</email>
+      <url>http://roc-wong.github.io</url>
+      <organization>中泰证券</organization>
+      <roles>
+        <role>architect</role>
+        <role>developer</role>
+      </roles>
+      <timezone>+8</timezone>
+    </developer>
+  </developers>
+
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+      <comments>A business-friendly OSS license</comments>
+    </license>
+  </licenses>
+
+</project>
