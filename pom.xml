@@ -23,7 +23,7 @@
     <guava.version>28.0-jre</guava.version>
     <simple-json.version>1.1.1</simple-json.version>
     <spring.version>5.0.10.RELEASE</spring.version>
-    <jackson.version>2.9.7</jackson.version>
+    <jackson.version>2.9.10.8</jackson.version>
   </properties>
 
   <dependencyManagement>
